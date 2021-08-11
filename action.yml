@@ -1,0 +1,32 @@
+name: 'Deploy Using Digest'
+description: 'Deploys the docker image with the associated tag using its digest'
+inputs:
+  image:
+    description: 'Docker Image Path'
+    required: true
+  service-name:
+    description: 'Service to deploy'
+    required: true
+  tag:
+    description: 'Docker Image tag to fetch digest for'
+    required: true
+  region:
+    description: 'Region to deploy to'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Get Docker Image Digest
+      id: get-docker-image-digest
+      run: |
+        export DOCKER_IMAGE_DIGEST=$(gcloud artifacts docker images list ${{ inputs.image }} --format='value(version)' --include-tags --filter tags~${{ inputs.tag }})
+        echo "::set-output name=DOCKER_IMAGE_DIGEST::$DOCKER_IMAGE_DIGEST"
+      shell: bash
+    - name: Deploy
+      run: |-
+        gcloud run deploy ${{ inputs.service-name }} \
+        --image ${{ inputs.image }}@${{ env.DOCKER_IMAGE_DIGEST }} \
+        --region ${{ inputs.region }}
+      shell: bash
+      env:
+        DOCKER_IMAGE_DIGEST: ${{ steps.get-docker-image-digest.outputs.DOCKER_IMAGE_DIGEST}}
